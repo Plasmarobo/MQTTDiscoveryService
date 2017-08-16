@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import json
 import pickle
+import os
 
 class MQTTDiscoveryServer:
   """Implements the MQTTDiscovery Protocol"""
@@ -18,7 +19,6 @@ class MQTTDiscoveryServer:
     self.default_name = "MQTT_Client"
     self.read_config()
     self.read_clients()
-    self.connected = False
 
   def __enter__(self):
     self.connect()
@@ -29,21 +29,28 @@ class MQTTDiscoveryServer:
     self.mqtt.disconnect()
 
   def read_config(self):
-    with open(self.config_file, 'r') as f:
-      s = f.read()
-      self.serial_index = json.loads(s)['serial_index']
+    if (os.path.isfile(self.config_file)):
+      with open(self.config_file, 'r') as f:
+        s = f.read()
+        self.serial_index = json.loads(s)['serial_index']
+    else:
+      self.write_config()
 
   def write_config(self):
-    with open(self.config_file, 'w') as f:
-      f.write(son.dumps({'serial_index': self.serial_index}, sort_keys=True,indent=2))
+    with open(self.config_file, 'w+') as f:
+      f.write(json.dumps({"serial_index": self.serial_index}))
 
   def read_clients(self):
-    with open(self.cache_file, 'r') as f:
-      self.categories = pickle.load(f)
+    if (os.path.isfile(self.cache_file)):
+      if os.stat(self.cache_file).st_size > 0:
+        with open(self.cache_file, 'rb') as f:
+          self.clients = pickle.load(f)
+    else:
+      self.write_clients()
 
   def write_clients(self):
-    with open(self.cache_file, 'w') as f:
-      pickle.dump(self.categories, f, pickle.HIGHEST_PROTOCOL)
+    with open(self.cache_file, 'wb+') as f:
+      pickle.dump(self.clients, f, pickle.HIGHEST_PROTOCOL)
 
   def add_client(self, discovery_name, category, client_name):
     self.pending.remove(discovery_name)
@@ -75,7 +82,7 @@ class MQTTDiscoveryServer:
   def connect(self):
     self.mqtt.connect(self.mqtt_ip, self.mqtt_port, 60)
 
-  def on_connect(self):
+  def on_connect(self, mqttc, userdata, flags, rc):
     print("Connect: "+str(rc))
     self.mqtt.subscribe("/discover")
     self.mqtt.loop_start()

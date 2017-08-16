@@ -19,7 +19,6 @@ class MQTTDiscoveryClient:
     self.name = category + "-" + name + "-" + str(random.randint(1,4294967295))
 
   def __enter__(self):
-    print
     self.connect()
     return self
   
